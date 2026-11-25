@@ -52,9 +52,6 @@ def _get_default_platform(simulation_id: str) -> str:
 
 # Interview prompt 优化前缀
 # 添加此前缀可以避免Agent调用工具，直接用文本回复
-INTERVIEW_PROMPT_PREFIX = "结合你的人设、所有的过往记忆与行动，不调用任何工具直接用文本回复我："
-
-
 def optimize_interview_prompt(prompt: str) -> str:
     """
     优化Interview提问，添加前缀避免Agent调用工具
@@ -67,10 +64,12 @@ def optimize_interview_prompt(prompt: str) -> str:
     """
     if not prompt:
         return prompt
-    # 避免重复添加前缀
-    if prompt.startswith(INTERVIEW_PROMPT_PREFIX):
+    prefix = t('api.interviewPromptPrefix')
+    # 避免重复添加前缀（也兼容历史中文前缀）
+    legacy = "结合你的人设、所有的过往记忆与行动，不调用任何工具直接用文本回复我："
+    if prompt.startswith(prefix) or prompt.startswith(legacy):
         return prompt
-    return f"{INTERVIEW_PROMPT_PREFIX}{prompt}"
+    return f"{prefix}{prompt}"
 
 
 # ============== 实体读取接口 ==============
@@ -623,7 +622,7 @@ def prepare_simulation():
                 if result_state.status == SimulationStatus.FAILED:
                     task_manager.fail_task(
                         task_id,
-                        result_state.error or "模拟准备失败"
+                        result_state.error or t('api.simulationPrepareFailed')
                     )
                 else:
                     task_manager.complete_task(
@@ -986,7 +985,7 @@ def get_simulation_history():
             project = ProjectManager.get_project(sim.project_id)
             if project and hasattr(project, 'files') and project.files:
                 sim_dict["files"] = [
-                    {"filename": f.get("filename", "未知文件")} 
+                    {"filename": f.get("filename", t('history.unknownFile'))} 
                     for f in project.files[:3]
                 ]
             else:

@@ -677,16 +677,19 @@ const customMaxRounds = ref(40)   // 默认推荐40轮
 
 // Watch stage to update phase
 watch(currentStage, (newStage) => {
-  if (newStage === '生成Agent人设' || newStage === 'generating_profiles') {
+  const profileStages = ['generating_profiles', '生成Agent人设', t('progress.generatingProfiles')]
+  const configStages = ['generating_config', '生成模拟配置', t('progress.generatingSimConfig')]
+  const scriptStages = ['copying_scripts', '准备模拟脚本', t('progress.preparingScripts')]
+  if (profileStages.includes(newStage)) {
     phase.value = 1
-  } else if (newStage === '生成模拟配置' || newStage === 'generating_config') {
+  } else if (configStages.includes(newStage)) {
     phase.value = 2
     // 进入配置生成阶段，开始轮询配置
     if (!configTimer) {
       addLog(t('log.startGeneratingConfig'))
       startConfigPolling()
     }
-  } else if (newStage === '准备模拟脚本' || newStage === 'copying_scripts') {
+  } else if (scriptStages.includes(newStage)) {
     phase.value = 2 // 仍属于配置阶段
   }
 })
@@ -872,7 +875,7 @@ const pollPrepareStatus = async () => {
       
       // 解析阶段信息并输出详细日志
       if (data.progress_detail) {
-        currentStage.value = data.progress_detail.current_stage_name || ''
+        currentStage.value = data.progress_detail.current_stage || data.progress_detail.current_stage_name || ''
         
         // 输出详细进度日志（避免重复）
         const detail = data.progress_detail

@@ -24,6 +24,10 @@
 
 </div>
 
+## Aviso
+
+Este repositorio es un fork modificado de [MiroFish](https://github.com/666ghj/MiroFish), publicado bajo la licencia **AGPL-3.0**. El idioma predeterminado es el español de México. El código fuente original está en [666ghj/MiroFish](https://github.com/666ghj/MiroFish). La imagen de Docker de este fork se publica como `ghcr.io/kcatzin-kc/mirofish` solo al subir un tag `v*` o al ejecutar el workflow a mano; no se publica en cada push a `main`.
+
 ## ⚡ Overview
 
 **MiroFish** is a next-generation AI prediction engine powered by multi-agent technology. By extracting seed information from the real world (such as breaking news, policy drafts, or financial signals), it automatically constructs a high-fidelity parallel digital world. Within this space, thousands of intelligent agents with independent personalities, long-term memory, and behavioral logic freely interact and undergo social evolution. You can inject variables dynamically from a "God's-eye view" to precisely deduce future trajectories — **rehearse the future in a digital sandbox, and win decisions after countless simulations**.
@@ -175,6 +179,8 @@ docker compose up -d
 Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 (backend)`
 
 > Mirror address for faster pulling is provided as comments in `docker-compose.yml`, replace if needed.
+
+`docker-compose.yml` still points at the upstream image `ghcr.io/666ghj/mirofish`. This fork's own image, `ghcr.io/kcatzin-kc/mirofish`, is published by `.github/workflows/docker-image.yml` on `v*` tags and on manual workflow runs. Until that package exists, build it locally with `docker build -t ghcr.io/kcatzin-kc/mirofish:latest .`.
 
 ## 📬 Join the Conversation
 

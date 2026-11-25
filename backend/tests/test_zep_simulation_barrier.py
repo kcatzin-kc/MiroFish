@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 import json
+import re
 
 import pytest
+
+from app.utils.locale import t
 from flask import Flask
 
 from app.api import simulation as simulation_api
@@ -107,7 +110,8 @@ def test_manual_stop_timeout_leaves_monitor_owned_state_stopping(monkeypatch):
     SimulationRunner._graph_memory_enabled.pop("sim-timeout", None)
 
     try:
-        with pytest.raises(TimeoutError, match="仍在停止中"):
+        stopping = t("api.simulationStillStopping", seconds="999")
+        with pytest.raises(TimeoutError, match=re.escape(stopping.split("999")[0])):
             SimulationRunner.stop_simulation("sim-timeout")
         assert state.runner_status == RunnerStatus.STOPPING
     finally:

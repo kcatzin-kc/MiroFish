@@ -1,22 +1,19 @@
 name: Build and push Docker image
 
+# Publish ghcr.io/kcatzin-kc/mirofish only from version tags or a manual run.
+# Pull requests build the image and do not push it. Pushes to main do not run this workflow.
 on:
   push:
-    tags: ["*"]
+    tags: ["v*"]
+  pull_request:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the image (default-branch runs only)
-        required: false
-        default: false
-        type: boolean
-
-env:
-  SHOULD_PUBLISH: ${{ github.event_name == 'push' || (inputs.publish && github.ref_name == github.event.repository.default_branch) }}
 
 permissions:
   contents: read
   packages: write
+
+env:
+  REGISTRY_IMAGE: ghcr.io/kcatzin-kc/mirofish
 
 jobs:
   build-and-push:
@@ -26,13 +23,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up QEMU
+        if: github.event_name != 'pull_request'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: env.SHOULD_PUBLISH == 'true'
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -43,18 +41,18 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/mirofish
+          images: ${{ env.REGISTRY_IMAGE }}
           tags: |
             type=ref,event=tag
             type=sha
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ env.SHOULD_PUBLISH == 'true' }}
-          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
