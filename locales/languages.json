@@ -9,7 +9,7 @@
   },
   "es": {
     "label": "Español",
-    "llmInstruction": "Por favor, responde en español."
+    "llmInstruction": "Responde en español de México, con trato de tú y un lenguaje claro."
   },
   "fr": {
     "label": "Français",

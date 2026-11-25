@@ -3,8 +3,21 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 // https://vite.dev/config/
+function defaultLocaleHtml() {
+  return {
+    name: 'default-locale-html',
+    transformIndexHtml(html) {
+      const raw = process.env.VITE_DEFAULT_LOCALE || 'es'
+      const prefix = String(raw).toLowerCase().split(/[-_]/)[0]
+      const locale = ['es', 'en', 'zh'].includes(prefix) ? prefix : 'es'
+      return html.replaceAll('__MIROFISH_DEFAULT_LOCALE__', locale)
+    }
+  }
+}
+
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), defaultLocaleHtml()],
+  envDir: path.resolve(__dirname, '..'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

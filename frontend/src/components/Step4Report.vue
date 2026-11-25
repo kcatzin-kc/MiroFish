@@ -398,6 +398,15 @@ import { getAgentLog, getConsoleLog } from '../api/report'
 const router = useRouter()
 const { t } = useI18n()
 
+const isLegacyNoReply = (text) => {
+  if (!text) return false
+  const trimmed = String(text).trim()
+  return trimmed === t('api.platformNoReply')
+    || trimmed === '（该平台未获得回复）'
+    || trimmed === '(该平台未获得回复)'
+    || trimmed === '[无回复]'
+}
+
 const props = defineProps({
   reportId: String,
   simulationId: String,
@@ -854,11 +863,11 @@ const parseInterview = (text) => {
         // 平台回退逻辑（兼容旧格式：只有一个平台标记的情况）
         if (!twitterMatch && redditMatch) {
           // 只有 Reddit 回答，仅在非占位文本时复制为默认显示
-          if (interview.redditAnswer && interview.redditAnswer !== '（该平台未获得回复）') {
+          if (interview.redditAnswer && !isLegacyNoReply(interview.redditAnswer)) {
             interview.twitterAnswer = interview.redditAnswer
           }
         } else if (twitterMatch && !redditMatch) {
-          if (interview.twitterAnswer && interview.twitterAnswer !== '（该平台未获得回复）') {
+          if (interview.twitterAnswer && !isLegacyNoReply(interview.twitterAnswer)) {
             interview.redditAnswer = interview.twitterAnswer
           }
         } else if (!twitterMatch && !redditMatch) {
@@ -1278,6 +1287,7 @@ const PanoramaDisplay = {
 const InterviewDisplay = {
   props: ['result', 'resultLength'],
   setup(props) {
+    const { t } = useI18n()
     // Format result size for display
     const formatSize = (length) => {
       if (!length) return ''
@@ -1330,8 +1340,7 @@ const InterviewDisplay = {
     // 检查是否为平台占位文本
     const isPlaceholderText = (text) => {
       if (!text) return true
-      const t = text.trim()
-      return t === '（该平台未获得回复）' || t === '(该平台未获得回复)' || t === '[无回复]'
+      return isLegacyNoReply(text)
     }
 
     // 尝试按问题编号分割回答
@@ -1346,7 +1355,7 @@ const InterviewDisplay = {
       let match
 
       // 优先尝试 "问题X：" 格式
-      const cnPattern = /(?:^|[\r\n]+)问题(\d+)[：:]\s*/g
+      const cnPattern = /(?:^|[\r\n]+)(?:问题|Question|Pregunta)\s*(\d+)\s*[：:.]\s*/gi
       while ((match = cnPattern.exec(answerText)) !== null) {
         matches.push({
           num: parseInt(match[1]),
@@ -1370,7 +1379,7 @@ const InterviewDisplay = {
       // 如果没有找到编号或只找到一个，返回整体
       if (matches.length <= 1) {
         const cleaned = answerText
-          .replace(/^问题\d+[：:]\s*/, '')
+          .replace(/^(?:问题|Question|Pregunta)\s*\d+\s*[：:.]\s*/i, '')
           .replace(/^\d+\.\s+/, '')
           .trim()
         return [cleaned || answerText]
@@ -1427,16 +1436,16 @@ const InterviewDisplay = {
       // Header Section
       h('div', { class: 'interview-header' }, [
         h('div', { class: 'header-main' }, [
-          h('div', { class: 'header-title' }, 'Agent Interview'),
+          h('div', { class: 'header-title' }, t('step4.interviewTitle')),
           h('div', { class: 'header-stats' }, [
             h('span', { class: 'stat-item' }, [
               h('span', { class: 'stat-value' }, props.result.successCount || props.result.interviews.length),
-              h('span', { class: 'stat-label' }, 'Interviewed')
+              h('span', { class: 'stat-label' }, t('step4.interviewed'))
             ]),
             props.result.totalCount > 0 && h('span', { class: 'stat-divider' }, '/'),
             props.result.totalCount > 0 && h('span', { class: 'stat-item' }, [
               h('span', { class: 'stat-value' }, props.result.totalCount),
-              h('span', { class: 'stat-label' }, 'Total')
+              h('span', { class: 'stat-label' }, t('step4.interviewTotal'))
             ]),
             props.resultLength && h('span', { class: 'stat-divider' }, '·'),
             props.resultLength && h('span', { class: 'stat-size' }, formatSize(props.resultLength))
@@ -1471,7 +1480,7 @@ const InterviewDisplay = {
         
         // Selection Reason - 选择理由
         props.result.interviews[activeIndex.value]?.selectionReason && h('div', { class: 'selection-reason' }, [
-          h('div', { class: 'reason-label' }, '选择理由'),
+          h('div', { class: 'reason-label' }, t('step4.selectionReason')),
           h('div', { class: 'reason-content' }, props.result.interviews[activeIndex.value].selectionReason)
         ]),
         
@@ -1479,7 +1488,7 @@ const InterviewDisplay = {
         h('div', { class: 'qa-thread' }, 
           (props.result.interviews[activeIndex.value]?.questions?.length > 0 
             ? props.result.interviews[activeIndex.value].questions 
-            : [props.result.interviews[activeIndex.value]?.question || 'No question available']
+            : [props.result.interviews[activeIndex.value]?.question || t('step4.noQuestion')]
           ).map((question, qIdx) => {
             const interview = props.result.interviews[activeIndex.value]
             const currentPlatform = getPlatformTab(activeIndex.value, qIdx)
@@ -1567,7 +1576,7 @@ const InterviewDisplay = {
 
       // Summary Section (Collapsible)
       props.result.summary && h('div', { class: 'summary-section' }, [
-        h('div', { class: 'summary-header' }, 'Interview Summary'),
+        h('div', { class: 'summary-header' }, t('step4.interviewSummary')),
         h('div', { 
           class: 'summary-content',
           innerHTML: renderMarkdown(props.result.summary.length > 500 ? props.result.summary.substring(0, 500) + '...' : props.result.summary)
@@ -1781,7 +1790,7 @@ const activeStep = computed(() => {
   if (doneSteps.length > 0) return doneSteps[doneSteps.length - 1]
   
   // 否则返回第一个步骤
-  return steps[0] || { noLabel: '--', title: '等待开始', status: 'todo', meta: '' }
+  return steps[0] || { noLabel: '--', title: t('step4.waitingToStart'), status: 'todo', meta: '' }
 })
 
 const workflowSteps = computed(() => {
@@ -1792,9 +1801,9 @@ const workflowSteps = computed(() => {
   steps.push({
     key: 'planning',
     noLabel: 'PL',
-    title: 'Planning / Outline',
+    title: t('step4.planningOutline'),
     status: planningStatus,
-    meta: planningStatus === 'active' ? 'IN PROGRESS' : ''
+    meta: planningStatus === 'active' ? t('step4.inProgressMeta') : ''
   })
 
   // Sections (if outline exists)
@@ -1810,7 +1819,7 @@ const workflowSteps = computed(() => {
       noLabel: String(idx).padStart(2, '0'),
       title: section.title,
       status,
-      meta: status === 'active' ? 'IN PROGRESS' : ''
+      meta: status === 'active' ? t('step4.inProgressMeta') : ''
     })
   })
 
@@ -1819,9 +1828,9 @@ const workflowSteps = computed(() => {
   steps.push({
     key: 'complete',
     noLabel: 'OK',
-    title: 'Complete',
+    title: t('step4.reportStepComplete'),
     status: completeStatus,
-    meta: completeStatus === 'active' ? 'FINALIZING' : ''
+    meta: completeStatus === 'active' ? t('step4.finalizing') : ''
   })
 
   return steps

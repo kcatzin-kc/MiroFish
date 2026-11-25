@@ -17,7 +17,7 @@ from zep_cloud import NotFoundError
 from ..config import Config
 from ..utils.logger import get_logger
 from ..utils.llm_client import LLMClient
-from ..utils.locale import get_locale, t
+from ..utils.locale import get_language_instruction, get_locale, t
 from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
 from ..utils.zep import (
     call_zep_read_with_retry,
@@ -1347,18 +1347,7 @@ class ZepToolsService:
         combined_prompt = "\n".join([f"{i+1}. {q}" for i, q in enumerate(result.interview_questions)])
         
         # 添加优化前缀，约束Agent回复格式
-        INTERVIEW_PROMPT_PREFIX = (
-            "你正在接受一次采访。请结合你的人设、所有的过往记忆与行动，"
-            "以纯文本方式直接回答以下问题。\n"
-            "回复要求：\n"
-            "1. 直接用自然语言回答，不要调用任何工具\n"
-            "2. 不要返回JSON格式或工具调用格式\n"
-            "3. 不要使用Markdown标题（如#、##、###）\n"
-            "4. 按问题编号逐一回答，每个回答以「问题X：」开头（X为问题编号）\n"
-            "5. 每个问题的回答之间用空行分隔\n"
-            "6. 回答要有实质内容，每个问题至少回答2-3句话\n\n"
-        )
-        optimized_prompt = f"{INTERVIEW_PROMPT_PREFIX}{combined_prompt}"
+        optimized_prompt = f"{t('api.interviewBatchPrefix')}{combined_prompt}"
         
         # Step 4: 调用真实的采访API（不指定platform，默认双平台同时采访）
         try:
@@ -1413,8 +1402,8 @@ class ZepToolsService:
                 reddit_response = self._clean_tool_call_response(reddit_response)
 
                 # 始终输出双平台标记
-                twitter_text = twitter_response if twitter_response else "（该平台未获得回复）"
-                reddit_text = reddit_response if reddit_response else "（该平台未获得回复）"
+                twitter_text = twitter_response if twitter_response else t('api.platformNoReply')
+                reddit_text = reddit_response if reddit_response else t('api.platformNoReply')
                 response_text = f"【Twitter平台回答】\n{twitter_text}\n\n【Reddit平台回答】\n{reddit_text}"
 
                 # 提取关键引言（从两个平台的回答中）
@@ -1425,19 +1414,21 @@ class ZepToolsService:
                 clean_text = re.sub(r'#{1,6}\s+', '', combined_responses)
                 clean_text = re.sub(r'\{[^}]*tool_name[^}]*\}', '', clean_text)
                 clean_text = re.sub(r'[*_`|>~\-]{2,}', '', clean_text)
-                clean_text = re.sub(r'问题\d+[：:]\s*', '', clean_text)
+                clean_text = re.sub(r'(?:问题|Question|Pregunta)\s*\d+\s*[：:.]\s*', '', clean_text, flags=re.IGNORECASE)
                 clean_text = re.sub(r'【[^】]+】', '', clean_text)
 
                 # 策略1（主）: 提取完整的有实质内容的句子
-                sentences = re.split(r'[。！？]', clean_text)
+                sentences = re.split(r'[。！？.!?]', clean_text)
                 meaningful = [
                     s.strip() for s in sentences
                     if 20 <= len(s.strip()) <= 150
                     and not re.match(r'^[\s\W，,；;：:、]+', s.strip())
-                    and not s.strip().startswith(('{', '问题'))
+                    and not s.strip().startswith('{')
+                    and not re.match(r'^(?:问题|Question|Pregunta)\s*\d+', s.strip(), re.IGNORECASE)
                 ]
                 meaningful.sort(key=len, reverse=True)
-                key_quotes = [s + "。" for s in meaningful[:3]]
+                quote_suffix = "。" if get_locale() == 'zh' else "."
+                key_quotes = [s + quote_suffix for s in meaningful[:3]]
 
                 # 策略2（补充）: 正确配对的中文引号「」内长文本
                 if not key_quotes:
@@ -1686,14 +1677,14 @@ class ZepToolsService:
         """生成采访摘要"""
         
         if not interviews:
-            return "未完成任何采访"
+            return t('api.noInterviewsCompleted')
         
         # 收集所有采访内容
         interview_texts = []
         for interview in interviews:
             interview_texts.append(f"【{interview.agent_name}（{interview.agent_role}）】\n{interview.response[:500]}")
         
-        quote_instruction = "引用受访者原话时使用中文引号「」" if get_locale() == 'zh' else 'Use quotation marks "" when quoting interviewees'
+        quote_instruction = t('api.quoteInstruction')
         system_prompt = f"""你是一个专业的新闻编辑。请根据多位受访者的回答，生成一份采访摘要。
 
 摘要要求：
@@ -1708,7 +1699,9 @@ class ZepToolsService:
 - 不要使用Markdown标题（如#、##、###）
 - 不要使用分割线（如---、***）
 - {quote_instruction}
-- 可以使用**加粗**标记关键词，但不要使用其他Markdown语法"""
+- 可以使用**加粗**标记关键词，但不要使用其他Markdown语法
+
+{get_language_instruction()}"""
 
         user_prompt = f"""采访主题：{interview_requirement}
 
@@ -1731,4 +1724,5 @@ class ZepToolsService:
         except Exception as e:
             logger.warning(t("console.generateInterviewSummaryFailed", error=e))
             # 降级：简单拼接
-            return f"共采访了{len(interviews)}位受访者，包括：" + "、".join([i.agent_name for i in interviews])
+            names = ("、" if get_locale() == 'zh' else ", ").join([i.agent_name for i in interviews])
+            return t('api.interviewFallbackSummary', count=len(interviews), names=names)
